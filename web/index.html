@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sortly · links with a short life</title>
+  <meta name="description" content="Shorten a link that self-destructs in 10 to 30 minutes. No sign-up.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='28' cy='38' r='22' fill='%23161616'/%3E%3Cpath d='M40 18 q6-10 14-8' stroke='%23161616' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='55' cy='10' r='7' fill='%23ffd23f'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <a class="logo" href="./" aria-label="sortly home">
+      <svg class="bomb" viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="28" cy="38" r="22" />
+        <circle class="shine" cx="20" cy="30" r="5" />
+        <path class="wick" d="M40 18 q6 -10 14 -8" />
+        <g class="spark"><circle cx="55" cy="10" r="6" /><path d="M55 0v5M55 15v5M45 10h5M60 10h5" /></g>
+      </svg>
+      sortly
+    </a>
+    <span class="tag">links with a short life</span>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Make it short.<br>Watch it <span class="scribble">vanish.</span></h1>
+      <p>Paste a link, pick a fuse, share it fast. Every sortly link self-destructs in 10 to 30 minutes. No sign-up, no dashboard, nothing to clean up afterwards.</p>
+    </section>
+
+    <p class="banner" id="gone" role="status" hidden></p>
+
+    <form class="card maker" id="maker" novalidate>
+      <label class="label" for="url">Your long, messy link</label>
+      <div class="input-row">
+        <input id="url" name="url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" required>
+        <button type="button" class="btn small ghost" id="paste" hidden>Paste</button>
+      </div>
+
+      <fieldset class="fuse-picker">
+        <legend class="label">Fuse length</legend>
+        <div class="chips" id="chips">
+          <label><input type="radio" name="ttl" value="10" checked><span>10<small>min</small></span></label>
+          <label><input type="radio" name="ttl" value="15"><span>15<small>min</small></span></label>
+          <label><input type="radio" name="ttl" value="20"><span>20<small>min</small></span></label>
+          <label><input type="radio" name="ttl" value="25"><span>25<small>min</small></span></label>
+          <label><input type="radio" name="ttl" value="30"><span>30<small>min</small></span></label>
+        </div>
+        <p class="hint" id="hint">About as long as a coffee break.</p>
+      </fieldset>
+
+      <button type="submit" class="btn go" id="go">Light the fuse</button>
+      <p class="error" id="error" role="alert"></p>
+    </form>
+
+    <section class="live" aria-labelledby="live-title">
+      <h2 id="live-title">Ticking <span class="pill" id="live-count">0</span></h2>
+      <ul class="links" id="links"></ul>
+      <p class="empty" id="empty">Nothing ticking yet. Links you make show up here, on this device only.</p>
+    </section>
+
+    <section class="graveyard" id="graveyard" aria-labelledby="rip-title" hidden>
+      <h2 id="rip-title">Graveyard</h2>
+      <ul class="graves" id="graves"></ul>
+    </section>
+
+    <section class="how" aria-label="How it works">
+      <div class="step s1"><b>1</b><h3>Paste</h3><p>Any http or https link. The longer and uglier, the better.</p></div>
+      <div class="step s2"><b>2</b><h3>Pick a fuse</h3><p>10 to 30 minutes. That's all the time it gets.</p></div>
+      <div class="step s3"><b>3</b><h3>Share fast</h3><p>When the fuse runs out the link is gone from the database. Not hidden, gone.</p></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Built with Go and MongoDB. A TTL index does the deleting, so nobody has to remember to.</p>
+  </footer>
+
+  <template id="link-tpl">
+    <li class="link-card">
+      <div class="link-head">
+        <a class="short" target="_blank" rel="noopener noreferrer"></a>
+        <span class="timer" aria-label="time left"></span>
+      </div>
+      <p class="dest"></p>
+      <div class="fuse" aria-hidden="true"><div class="burn"><i class="flame"></i></div></div>
+      <div class="link-foot">
+        <span class="clicks"></span>
+        <div class="actions">
+          <button type="button" class="btn small" data-act="copy">Copy</button>
+          <button type="button" class="btn small danger" data-act="kill">Detonate</button>
+        </div>
+      </div>
+      <span class="stamp" aria-hidden="true">POOF</span>
+    </li>
+  </template>
+</body>
+</html>

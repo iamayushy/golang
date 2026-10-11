@@ -18,12 +18,19 @@ type LinkRepository struct {
 	coll *mongo.Collection
 }
 
-// NewLinkRepository returns a repository and ensures the unique index on code exists.
+// NewLinkRepository returns a repository and ensures its indexes exist: a unique
+// index on code, and a TTL index so MongoDB deletes links once expires_at passes.
 func NewLinkRepository(ctx context.Context, db *mongo.Database) (*LinkRepository, error) {
 	coll := db.Collection(linksCollection)
-	_, err := coll.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bson.D{{Key: "code", Value: 1}},
-		Options: options.Index().SetUnique(true),
+	_, err := coll.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "code", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys:    bson.D{{Key: "expires_at", Value: 1}},
+			Options: options.Index().SetExpireAfterSeconds(0),
+		},
 	})
 	if err != nil {
 		return nil, err

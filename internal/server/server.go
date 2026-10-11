@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/iamayushy/golang/internal/shortener"
@@ -16,38 +17,64 @@ const maxBodyBytes = 1 << 20
 // Pinger reports whether a dependency (e.g. the database) is reachable.
 type Pinger func(ctx context.Context) error
 
+type Options struct {
+	// BaseURL is the public origin of this API, used to build short URLs.
+	BaseURL string
+	// FrontendURL, if set, is where / and dead short links redirect to.
+	FrontendURL string
+	// AllowedOrigins lists origins allowed by CORS; "*" allows any.
+	AllowedOrigins []string
+	// CreatesPerMinute caps link creation per client IP; 0 disables the limit.
+	CreatesPerMinute int
+	Ping             Pinger
+}
+
 type Server struct {
-	logger  *slog.Logger
-	links   *shortener.Service
-	baseURL string
-	ping    Pinger
+	logger *slog.Logger
+	links  *shortener.Service
+	opts   Options
 }
 
 // New builds the HTTP handler with all routes and middleware.
-func New(logger *slog.Logger, links *shortener.Service, baseURL string, ping Pinger) http.Handler {
-	s := &Server{logger: logger, links: links, baseURL: baseURL, ping: ping}
+func New(logger *slog.Logger, links *shortener.Service, opts Options) http.Handler {
+	s := &Server{logger: logger, links: links, opts: opts}
+
+	create := http.Handler(http.HandlerFunc(s.handleCreateLink))
+	if opts.CreatesPerMinute > 0 {
+		create = rateLimit(newRateLimiter(opts.CreatesPerMinute, time.Minute), create)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("GET /healthz", s.handleHealth)
-	mux.HandleFunc("POST /api/links", s.handleCreateLink)
+	mux.Handle("POST /api/links", create)
 	mux.HandleFunc("GET /api/links/{code}", s.handleGetLink)
 	mux.HandleFunc("DELETE /api/links/{code}", s.handleDeleteLink)
 	mux.HandleFunc("GET /{code}", s.handleRedirect)
 
-	return recoverer(logger, requestLogger(logger, mux))
+	return recoverer(logger, requestLogger(logger, cors(opts.AllowedOrigins, mux)))
 }
 
 type linkResponse struct {
 	shortener.Link
-	ShortURL string `json:"short_url"`
+	ShortURL         string `json:"short_url"`
+	ExpiresInSeconds int64  `json:"expires_in_seconds"`
+	DeleteToken      string `json:"delete_token,omitempty"`
 }
 
 func (s *Server) toResponse(link shortener.Link) linkResponse {
-	return linkResponse{Link: link, ShortURL: s.baseURL + "/" + link.Code}
+	return linkResponse{
+		Link:             link,
+		ShortURL:         s.opts.BaseURL + "/" + link.Code,
+		ExpiresInSeconds: int64(s.links.TimeLeft(link).Seconds()),
+	}
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	if s.opts.FrontendURL != "" {
+		http.Redirect(w, r, s.opts.FrontendURL, http.StatusFound)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"service": "url-shortener",
 		"status":  "ok",
@@ -64,7 +91,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-	if err := s.ping(ctx); err != nil {
+	if err := s.opts.Ping(ctx); err != nil {
 		s.logger.Error("health check failed", "err", err)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
 		return
@@ -74,7 +101,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		URL string `json:"url"`
+		URL        string `json:"url"`
+		TTLMinutes int    `json:"ttl_minutes"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -82,12 +110,14 @@ func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	link, err := s.links.Shorten(r.Context(), req.URL)
+	created, err := s.links.Shorten(r.Context(), req.URL, time.Duration(req.TTLMinutes)*time.Minute)
 	if err != nil {
 		s.handleError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, s.toResponse(link))
+	resp := s.toResponse(created.Link)
+	resp.DeleteToken = created.DeleteToken
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 func (s *Server) handleGetLink(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +130,8 @@ func (s *Server) handleGetLink(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteLink(w http.ResponseWriter, r *http.Request) {
-	if err := s.links.Delete(r.Context(), r.PathValue("code")); err != nil {
+	err := s.links.Delete(r.Context(), r.PathValue("code"), r.Header.Get("X-Delete-Token"))
+	if err != nil {
 		s.handleError(w, err)
 		return
 	}
@@ -108,7 +139,12 @@ func (s *Server) handleDeleteLink(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRedirect(w http.ResponseWriter, r *http.Request) {
-	link, err := s.links.Resolve(r.Context(), r.PathValue("code"))
+	code := r.PathValue("code")
+	link, err := s.links.Resolve(r.Context(), code)
+	if errors.Is(err, shortener.ErrNotFound) && s.opts.FrontendURL != "" {
+		http.Redirect(w, r, s.opts.FrontendURL+"/?gone="+url.QueryEscape(code), http.StatusFound)
+		return
+	}
 	if err != nil {
 		s.handleError(w, err)
 		return
@@ -120,8 +156,10 @@ func (s *Server) handleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, shortener.ErrNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, shortener.ErrInvalidURL):
+	case errors.Is(err, shortener.ErrInvalidURL), errors.Is(err, shortener.ErrInvalidTTL):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, shortener.ErrInvalidToken):
+		writeError(w, http.StatusForbidden, err.Error())
 	default:
 		s.logger.Error("request failed", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
@@ -136,40 +174,4 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
-}
-
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (r *statusRecorder) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
-}
-
-func requestLogger(logger *slog.Logger, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(rec, r)
-		logger.Info("request",
-			"method", r.Method,
-			"path", r.URL.Path,
-			"status", rec.status,
-			"duration", time.Since(start),
-		)
-	})
-}
-
-func recoverer(logger *slog.Logger, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if err := recover(); err != nil {
-				logger.Error("panic recovered", "err", err, "path", r.URL.Path)
-				writeError(w, http.StatusInternalServerError, "internal server error")
-			}
-		}()
-		next.ServeHTTP(w, r)
-	})
 }

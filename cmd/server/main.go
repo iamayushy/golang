@@ -59,8 +59,14 @@ func run(logger *slog.Logger) error {
 
 	ping := func(ctx context.Context) error { return client.Ping(ctx, nil) }
 	srv := &http.Server{
-		Addr:              cfg.Addr,
-		Handler:           server.New(logger, shortener.NewService(repo), cfg.BaseURL, ping),
+		Addr: cfg.Addr,
+		Handler: server.New(logger, shortener.NewService(repo), server.Options{
+			BaseURL:          cfg.BaseURL,
+			FrontendURL:      cfg.FrontendURL,
+			AllowedOrigins:   cfg.AllowedOrigins,
+			CreatesPerMinute: cfg.RateLimit,
+			Ping:             ping,
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
