@@ -28,6 +28,7 @@ func New(logger *slog.Logger, links *shortener.Service, baseURL string, ping Pin
 	s := &Server{logger: logger, links: links, baseURL: baseURL, ping: ping}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("POST /api/links", s.handleCreateLink)
 	mux.HandleFunc("GET /api/links/{code}", s.handleGetLink)
@@ -44,6 +45,20 @@ type linkResponse struct {
 
 func (s *Server) toResponse(link shortener.Link) linkResponse {
 	return linkResponse{Link: link, ShortURL: s.baseURL + "/" + link.Code}
+}
+
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"service": "url-shortener",
+		"status":  "ok",
+		"endpoints": []string{
+			"POST /api/links",
+			"GET /api/links/{code}",
+			"DELETE /api/links/{code}",
+			"GET /{code}",
+			"GET /healthz",
+		},
+	})
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

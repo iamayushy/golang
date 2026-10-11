@@ -21,6 +21,7 @@ See `.env.example`.
 | `GET`    | `/api/links/{code}` | Link details and click count             |
 | `DELETE` | `/api/links/{code}` | Delete a link                            |
 | `GET`    | `/{code}`           | Redirect (302) to the original URL, counts a click |
+| `GET`    | `/`                 | Service info (200), used by deploy health checks |
 | `GET`    | `/healthz`          | `200` if MongoDB is reachable, else `503` |
 
 ```sh

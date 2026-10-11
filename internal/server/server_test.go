@@ -32,6 +32,15 @@ func do(h http.Handler, method, path, body string) *httptest.ResponseRecorder {
 	return rec
 }
 
+func TestIndex(t *testing.T) {
+	h := newTestHandler(nil)
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		if rec := do(h, method, "/", ""); rec.Code != http.StatusOK {
+			t.Fatalf("%s / status = %d, want 200", method, rec.Code)
+		}
+	}
+}
+
 func TestHealth(t *testing.T) {
 	if rec := do(newTestHandler(nil), http.MethodGet, "/healthz", ""); rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
