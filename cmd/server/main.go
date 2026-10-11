@@ -75,7 +75,8 @@ func run(logger *slog.Logger) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		logger.Info("server starting", "addr", cfg.Addr, "db", cfg.MongoDB)
+		logger.Info("server starting", "addr", cfg.Addr, "db", cfg.MongoDB,
+			"base_url", cfg.BaseURL, "frontend_url", cfg.FrontendURL, "allowed_origins", cfg.AllowedOrigins)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}

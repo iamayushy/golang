@@ -34,7 +34,7 @@ func Load() (Config, error) {
 		MongoURI:        os.Getenv("MONGO_URI"),
 		MongoDB:         getEnv("MONGO_DB", "urlshortener"),
 		FrontendURL:     frontendURL,
-		AllowedOrigins:  splitList(getEnv("ALLOWED_ORIGINS", frontendURL)),
+		AllowedOrigins:  allowedOrigins(frontendURL),
 		RateLimit:       rateLimit,
 		ShutdownTimeout: 10 * time.Second,
 	}
@@ -49,6 +49,18 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// allowedOrigins reads ALLOWED_ORIGINS, falling back to the frontend URL. With
+// neither set, any origin may call the API: it uses no cookies, so that is safe.
+func allowedOrigins(frontendURL string) []string {
+	if origins := splitList(os.Getenv("ALLOWED_ORIGINS")); len(origins) > 0 {
+		return origins
+	}
+	if frontendURL != "" {
+		return []string{frontendURL}
+	}
+	return []string{"*"}
 }
 
 func splitList(s string) []string {

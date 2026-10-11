@@ -17,7 +17,7 @@ Short links with a short life. Every link self-destructs 10 to 30 minutes after 
 | `PORT`               | no       | `8080`                    | Port the HTTP server listens on |
 | `BASE_URL`           | no       | `http://localhost:$PORT`  | Public URL of the API, used to build `short_url` |
 | `FRONTEND_URL`       | no       | —                         | Public URL of the web app. When set, `/` and expired short links redirect there |
-| `ALLOWED_ORIGINS`    | no       | value of `FRONTEND_URL`   | Comma-separated origins allowed to call the API from a browser (CORS); `*` allows any |
+| `ALLOWED_ORIGINS`    | no       | `FRONTEND_URL`, else `*`  | Comma-separated origins allowed to call the API from a browser (CORS), e.g. `https://sort.atlair.app`. Must match the browser's origin exactly: scheme, host and port, no path |
 | `RATE_LIMIT_PER_MIN` | no       | `20`                      | Links one IP can create per minute; `0` turns the limit off |
 
 ### Web (`web/Dockerfile`)
