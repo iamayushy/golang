@@ -5,6 +5,7 @@
   const STORE_LIVE = "sortly.live";
   const STORE_DEAD = "sortly.graves";
   const POLL_MS = 15000;
+  const STATS_MS = 10000;
   const HURRY_SECONDS = 60;
   const MAX_GRAVES = 5;
 
@@ -36,6 +37,12 @@
   const gravesEl = $("#graves");
   const graveyardEl = $("#graveyard");
   const tpl = $("#link-tpl");
+  const statsEl = $("#stats");
+  const statTotal = $("#stat-total");
+  const statTotalLabel = $("#stat-total-label");
+  const statLive = $("#stat-live");
+  const numberFmt = new Intl.NumberFormat();
+  const shown = { total: null, live: null };
 
   let live = load(STORE_LIVE);
   let graves = load(STORE_DEAD);
@@ -106,6 +113,7 @@
       save();
       addCard(item, true);
       input.value = "";
+      if (shown.total !== null) showStats(shown.total + 1, shown.live + 1);
       burst(goBtn);
       goBtn.classList.remove("lit");
       void goBtn.offsetWidth;
@@ -280,6 +288,47 @@
     tick();
   }
 
+  // ---------- site-wide counters ----------
+
+  async function loadStats() {
+    if (document.hidden) return;
+    try {
+      const st = await api("/api/stats");
+      showStats(st.total_created, st.live);
+    } catch {
+      /* stats are a garnish; keep whatever we showed last */
+    }
+  }
+
+  function showStats(total, liveNow) {
+    setCount(statTotal, "total", total);
+    setCount(statLive, "live", liveNow);
+    statTotalLabel.textContent = total === 1 ? "link lit so far" : "links lit so far";
+    statsEl.hidden = false;
+  }
+
+  // Rolls the number up to its new value and gives it a little bump.
+  function setCount(el, key, value) {
+    const from = shown[key];
+    shown[key] = value;
+    if (from === null || from === value || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      el.textContent = numberFmt.format(value);
+      return;
+    }
+    const start = performance.now();
+    const step = (t) => {
+      const p = Math.min(1, (t - start) / 500);
+      el.textContent = numberFmt.format(Math.round(from + (value - from) * (1 - (1 - p) ** 3)));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+    if (value > from) {
+      el.classList.remove("bump");
+      void el.offsetWidth;
+      el.classList.add("bump");
+    }
+  }
+
   // ---------- garnish ----------
 
   function burst(origin) {
@@ -355,7 +404,11 @@
   tick();
   setInterval(tick, 1000);
   setInterval(pollClicks, POLL_MS);
+  loadStats();
+  setInterval(loadStats, STATS_MS);
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) pollClicks();
+    if (document.hidden) return;
+    pollClicks();
+    loadStats();
   });
 })();

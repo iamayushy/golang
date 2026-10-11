@@ -62,6 +62,25 @@ func TestExpiredLinksAreHidden(t *testing.T) {
 	}
 }
 
+func TestStatsCountExpiredLinksInTotalOnly(t *testing.T) {
+	ctx := context.Background()
+	svc, now := newTestService(NewMemoryRepository())
+	if _, err := svc.Shorten(ctx, "https://example.com", 10*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Shorten(ctx, "https://example.com", 30*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	*now = now.Add(15 * time.Minute)
+	st, err := svc.Stats(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st != (Stats{TotalCreated: 2, Live: 1}) {
+		t.Fatalf("Stats = %+v, want 2 created, 1 live", st)
+	}
+}
+
 func TestShortenRejectsInvalidInput(t *testing.T) {
 	svc, _ := newTestService(NewMemoryRepository())
 	for _, raw := range []string{"", "example.com", "ftp://example.com", "http://", "javascript:alert(1)"} {

@@ -119,6 +119,17 @@ func TestDeadLinkRedirectsToFrontend(t *testing.T) {
 	}
 }
 
+func TestStats(t *testing.T) {
+	h := newTestHandler(Options{})
+	for range 3 {
+		do(h, http.MethodPost, "/api/links", `{"url":"https://example.com"}`)
+	}
+	rec := do(h, http.MethodGet, "/api/stats", "")
+	if rec.Code != http.StatusOK || rec.Body.String() != "{\"total_created\":3,\"live\":3}\n" {
+		t.Fatalf("stats = %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestCreateLinkBadInput(t *testing.T) {
 	h := newTestHandler(Options{})
 	for _, body := range []string{`not json`, `{"url":"not-a-url"}`, `{}`, `{"url":"https://a.b","ttl_minutes":60}`} {

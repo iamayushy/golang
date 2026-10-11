@@ -35,6 +35,7 @@ See `.env.example`.
 |----------|---------------------|------------------------------------------|
 | `POST`   | `/api/links`        | Create a short link: `{"url": "https://...", "ttl_minutes": 20}` (10–30, default 10). The response includes a one-time `delete_token` |
 | `GET`    | `/api/links/{code}` | Link details and click count             |
+| `GET`    | `/api/stats`        | Site-wide counts: `{"total_created": 4312, "live": 27}` |
 | `DELETE` | `/api/links/{code}` | Delete a link early; needs header `X-Delete-Token` |
 | `GET`    | `/{code}`           | Redirect (302) to the original URL, counts a click |
 | `GET`    | `/`                 | Service info (200), or a redirect to `FRONTEND_URL` when set |

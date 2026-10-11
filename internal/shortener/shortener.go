@@ -46,6 +46,13 @@ type Repository interface {
 	// Resolve increments the click counter and returns the link.
 	Resolve(ctx context.Context, code string) (Link, error)
 	Delete(ctx context.Context, code string) error
+	// Stats reports how many links were ever created and how many expire after now.
+	Stats(ctx context.Context, now time.Time) (Stats, error)
+}
+
+type Stats struct {
+	TotalCreated int64 `json:"total_created"`
+	Live         int64 `json:"live"`
 }
 
 const (
@@ -128,6 +135,10 @@ func (s *Service) Delete(ctx context.Context, code, token string) error {
 		return ErrInvalidToken
 	}
 	return s.repo.Delete(ctx, code)
+}
+
+func (s *Service) Stats(ctx context.Context) (Stats, error) {
+	return s.repo.Stats(ctx, s.now())
 }
 
 // TimeLeft reports how long until link expires, never negative.

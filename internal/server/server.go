@@ -48,6 +48,7 @@ func New(logger *slog.Logger, links *shortener.Service, opts Options) http.Handl
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.Handle("POST /api/links", create)
+	mux.HandleFunc("GET /api/stats", s.handleStats)
 	mux.HandleFunc("GET /api/links/{code}", s.handleGetLink)
 	mux.HandleFunc("DELETE /api/links/{code}", s.handleDeleteLink)
 	mux.HandleFunc("GET /{code}", s.handleRedirect)
@@ -81,6 +82,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		"endpoints": []string{
 			"POST /api/links",
 			"GET /api/links/{code}",
+			"GET /api/stats",
 			"DELETE /api/links/{code}",
 			"GET /{code}",
 			"GET /healthz",
@@ -118,6 +120,15 @@ func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 	resp := s.toResponse(created.Link)
 	resp.DeleteToken = created.DeleteToken
 	writeJSON(w, http.StatusCreated, resp)
+}
+
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := s.links.Stats(r.Context())
+	if err != nil {
+		s.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, stats)
 }
 
 func (s *Server) handleGetLink(w http.ResponseWriter, r *http.Request) {

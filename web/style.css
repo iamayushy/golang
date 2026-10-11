@@ -86,6 +86,31 @@ h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.05; m
   animation: fade-out 4s ease-in-out infinite;
 }
 
+.stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+.sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 15px/1 var(--body);
+  border: var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  padding: 8px 16px 8px 12px;
+}
+.sticker b { font: 400 24px/1 var(--display); font-variant-numeric: tabular-nums; }
+.sticker.lit { background: var(--cyan); transform: rotate(-2deg); }
+.sticker.burning { background: var(--orange); transform: rotate(1.5deg); }
+.sticker b.bump { animation: bump .45s cubic-bezier(.3, 1.8, .5, 1); }
+.mini-flame {
+  width: 14px;
+  height: 14px;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 50% 0 50% 50%;
+  transform: rotate(-45deg);
+  animation: flame .3s ease-in-out infinite alternate;
+}
+
 /* ---------- shared bits ---------- */
 .card {
   background: var(--yellow);
@@ -358,6 +383,7 @@ h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.05; m
 .maker input[type="url"], .short, .clicks, .graves code, .banner code { font-variant-ligatures: none; }
 
 /* ---------- motion ---------- */
+@keyframes bump { 40% { transform: scale(1.45) rotate(-6deg); color: var(--pink); } }
 @keyframes flicker { 50% { transform: scale(.75) rotate(20deg); } }
 @keyframes jiggle { 25% { transform: rotate(-12deg); } 75% { transform: rotate(10deg); } }
 @keyframes fade-out { 0%, 35% { opacity: 1; filter: none; } 55%, 65% { opacity: .1; filter: blur(3px); } 85%, 100% { opacity: 1; filter: none; } }
