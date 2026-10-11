@@ -111,6 +111,25 @@ func TestLinkLifecycle(t *testing.T) {
 	}
 }
 
+func TestShortURLFromRequestWhenBaseURLUnset(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h := New(logger, shortener.NewService(shortener.NewMemoryRepository()), Options{
+		Ping: func(context.Context) error { return nil },
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/links", strings.NewReader(`{"url":"https://example.com"}`))
+	req.Host = "internal:8080"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("X-Forwarded-Host", "sortly.example")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	created := decode(t, rec)
+	if want := "https://sortly.example/" + created.Code; created.ShortURL != want {
+		t.Fatalf("short_url = %q, want %q", created.ShortURL, want)
+	}
+}
+
 func TestDeadLinkRedirectsToFrontend(t *testing.T) {
 	h := newTestHandler(Options{FrontendURL: "https://app.example"})
 	rec := do(h, http.MethodGet, "/nope42", "")

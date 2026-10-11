@@ -30,7 +30,7 @@ func Load() (Config, error) {
 	frontendURL := strings.TrimRight(os.Getenv("FRONTEND_URL"), "/")
 	cfg := Config{
 		Addr:            ":" + port,
-		BaseURL:         strings.TrimRight(getEnv("BASE_URL", "http://localhost:"+port), "/"),
+		BaseURL:         strings.TrimRight(os.Getenv("BASE_URL"), "/"),
 		MongoURI:        os.Getenv("MONGO_URI"),
 		MongoDB:         getEnv("MONGO_DB", "urlshortener"),
 		FrontendURL:     frontendURL,

@@ -1,7 +1,8 @@
 (() => {
   "use strict";
 
-  const API = ((window.SORTLY_CONFIG && window.SORTLY_CONFIG.apiUrl) || "").replace(/\/+$/, "");
+  const IS_LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+  const API = resolveApi();
   const STORE_LIVE = "sortly.live";
   const STORE_DEAD = "sortly.graves";
   const POLL_MS = 15000;
@@ -47,6 +48,15 @@
   let live = load(STORE_LIVE);
   let graves = load(STORE_DEAD);
   const cards = new Map();
+
+  // The web container writes API_URL into config.js. Without it, only a local
+  // dev setup can guess the API; a deployed site must not quietly call localhost.
+  function resolveApi() {
+    const configured = ((window.SORTLY_CONFIG && window.SORTLY_CONFIG.apiUrl) || "").trim().replace(/\/+$/, "");
+    if (configured && (IS_LOCAL || !/^https?:\/\/(localhost|127\.0\.0\.1)\b/.test(configured))) return configured;
+    if (!configured && IS_LOCAL) return "http://localhost:8080";
+    return null;
+  }
 
   function load(key) {
     try {
@@ -392,6 +402,14 @@
   }
 
   // ---------- boot ----------
+
+  if (API === null) {
+    const banner = $("#gone");
+    banner.textContent = "This site isn't connected to its API yet. Set API_URL on the web service and redeploy.";
+    banner.hidden = false;
+    goBtn.disabled = true;
+    return;
+  }
 
   live = live.filter((l) => l && l.code && l.expiresAt > Date.now());
   live.forEach((item) => addCard(item, false));

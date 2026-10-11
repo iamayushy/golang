@@ -15,7 +15,7 @@ Short links with a short life. Every link self-destructs 10 to 30 minutes after 
 | `MONGO_URI`          | yes      | —                         | MongoDB connection string, e.g. `mongodb://localhost:27017` or an Atlas `mongodb+srv://...` URI |
 | `MONGO_DB`           | no       | `urlshortener`            | Database name (links live in the `links` collection) |
 | `PORT`               | no       | `8080`                    | Port the HTTP server listens on |
-| `BASE_URL`           | no       | `http://localhost:$PORT`  | Public URL of the API, used to build `short_url` |
+| `BASE_URL`           | no       | from the request          | Public URL of the API, used to build `short_url`, e.g. `https://sortly.atlair.app`. If unset, it comes from the request's host and `X-Forwarded-Proto`/`X-Forwarded-Host` |
 | `FRONTEND_URL`       | no       | —                         | Public URL of the web app. When set, `/` and expired short links redirect there |
 | `ALLOWED_ORIGINS`    | no       | `FRONTEND_URL`, else `*`  | Comma-separated origins allowed to call the API from a browser (CORS), e.g. `https://sort.atlair.app`. Must match the browser's origin exactly: scheme, host and port, no path |
 | `RATE_LIMIT_PER_MIN` | no       | `20`                      | Links one IP can create per minute; `0` turns the limit off |
@@ -24,7 +24,7 @@ Short links with a short life. Every link self-destructs 10 to 30 minutes after 
 
 | Variable  | Required | Default                 | Description |
 |-----------|----------|-------------------------|-------------|
-| `API_URL` | yes      | `http://localhost:8080` | Public URL of the API the browser calls |
+| `API_URL` | yes      | —                       | Public URL of the API the browser calls, e.g. `https://sortly.atlair.app`. Read at container start; also accepted as a build arg. Without it the site shows a "not connected" warning |
 | `PORT`    | no       | `8080`                  | Port nginx listens on |
 
 See `.env.example`.

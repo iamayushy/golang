@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/iamayushy/golang/internal/shortener"
@@ -19,6 +20,7 @@ type Pinger func(ctx context.Context) error
 
 type Options struct {
 	// BaseURL is the public origin of this API, used to build short URLs.
+	// If empty it is worked out from each request (see publicBase).
 	BaseURL string
 	// FrontendURL, if set, is where / and dead short links redirect to.
 	FrontendURL string
@@ -63,12 +65,37 @@ type linkResponse struct {
 	DeleteToken      string `json:"delete_token,omitempty"`
 }
 
-func (s *Server) toResponse(link shortener.Link) linkResponse {
+func (s *Server) toResponse(r *http.Request, link shortener.Link) linkResponse {
 	return linkResponse{
 		Link:             link,
-		ShortURL:         s.opts.BaseURL + "/" + link.Code,
+		ShortURL:         s.publicBase(r) + "/" + link.Code,
 		ExpiresInSeconds: int64(s.links.TimeLeft(link).Seconds()),
 	}
+}
+
+// publicBase is the origin clients reached us on. Behind a TLS-terminating proxy
+// the request arrives as plain http, so the proxy's forwarded headers win.
+func (s *Server) publicBase(r *http.Request) string {
+	if s.opts.BaseURL != "" {
+		return s.opts.BaseURL
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := firstHeaderValue(r, "X-Forwarded-Proto"); proto == "http" || proto == "https" {
+		scheme = proto
+	}
+	host := r.Host
+	if fwd := firstHeaderValue(r, "X-Forwarded-Host"); fwd != "" {
+		host = fwd
+	}
+	return scheme + "://" + host
+}
+
+func firstHeaderValue(r *http.Request, name string) string {
+	v, _, _ := strings.Cut(r.Header.Get(name), ",")
+	return strings.TrimSpace(v)
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +144,7 @@ func (s *Server) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 		s.handleError(w, err)
 		return
 	}
-	resp := s.toResponse(created.Link)
+	resp := s.toResponse(r, created.Link)
 	resp.DeleteToken = created.DeleteToken
 	writeJSON(w, http.StatusCreated, resp)
 }
@@ -137,7 +164,7 @@ func (s *Server) handleGetLink(w http.ResponseWriter, r *http.Request) {
 		s.handleError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.toResponse(link))
+	writeJSON(w, http.StatusOK, s.toResponse(r, link))
 }
 
 func (s *Server) handleDeleteLink(w http.ResponseWriter, r *http.Request) {
